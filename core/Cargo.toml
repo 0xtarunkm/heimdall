@@ -4,7 +4,14 @@ edition.workspace = true
 version.workspace = true
 authors.workspace = true
 
+[lib]
+name = "heimdall_plugin"
+crate-type = ["cdylib"]
+
 [dependencies]
+anchor-lang = "0.30.1"
+borsh = "1.5.5"
+bs58 = "0.5.1"
 serde = { version = "1.0.218", features = ["derive"] }
 serde_json = "1.0.139"
 solana-geyser-plugin-interface = "1.18.26"
@@ -13,4 +20,4 @@ sqlx = { version = "0.8.3", default-features = false, features = [
     "runtime-tokio-native-tls",
     "macros",
 ] }
-tokio = { version = "1.43.0", features = ["rt"] }
+tokio = { version = "1.43.0", features = ["full"] }
