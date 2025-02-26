@@ -1,5 +1,5 @@
 [workspace]
-members = [ "common","core", "fetch-service"]
+members = ["core"]
 
 resolver = "2"
 

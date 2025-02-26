@@ -1,7 +1,0 @@
-[package]
-name = "fetch-service"
-edition.workspace = true
-version.workspace = true
-authors.workspace = true
-
-[dependencies]
