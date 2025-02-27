@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT \n                account,\n                name,\n                seed as \"seed!: i64\",\n                mint,\n                funding_goal as \"funding_goal!: i64\",\n                pool_mint_supply::text,\n                funding_raised as \"funding_raised!: i64\",\n                available_tokens::text,\n                base_price,\n                tokens_sold::text,\n                bump as \"bump!: i16\",\n                vault_bump as \"vault_bump!: i16\",\n                mint_bump as \"mint_bump!: i16\",\n                updated_at::text\n            FROM listings \n            WHERE account = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "account",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "seed!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "mint",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "funding_goal!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "pool_mint_supply",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "funding_raised!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "available_tokens",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "base_price",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 9,
+        "name": "tokens_sold",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "bump!: i16",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 11,
+        "name": "vault_bump!: i16",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 12,
+        "name": "mint_bump!: i16",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 13,
+        "name": "updated_at",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "7043b26b5893e6347044a348f04c0fb5d85dbcd38f624701bcae954e15347f93"
+}

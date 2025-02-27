@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package listing_stream;
+
+service ListingStream {
+    rpc StreamListings(StreamRequest) returns (stream Listing);
+}
+
+message StreamRequest {
+    repeated string program_ids = 1;
+}
+
+message Listing {
+    string account = 1;
+    string name = 2;
+    uint64 seed = 3;
+    string mint = 4;
+    uint64 funding_goal = 5;
+    string pool_mint_supply = 6;
+    uint64 funding_raised = 7;
+    string available_tokens = 8;
+    double base_price = 9;
+    string tokens_sold = 10;
+    uint32 bump = 11;
+    uint32 vault_bump = 12;
+    uint32 mint_bump = 13;
+    string updated_at = 14;
+}

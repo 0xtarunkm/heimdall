@@ -235,7 +235,27 @@ impl GeyserPlugin for Heimdall {
                             });
 
                             match result {
-                                Ok(_) => println!("Successfully inserted/updated listing for account: {}", account_pubkey),
+                                Ok(_) => {
+                                    println!("Successfully inserted/updated listing for account: {}", account_pubkey);
+                                    let notify_payload = serde_json::json!({
+                                        "account": account_pubkey,
+                                        "action": "update"
+                                    }).to_string();
+
+                                    let rt = Runtime::new().unwrap();
+                                    let pool = self.db_pool.as_ref().unwrap();
+                                    
+                                    let notify_result = rt.block_on(async {
+                                        sqlx::query("SELECT pg_notify('account_updates', $1)")
+                                            .bind(&notify_payload)
+                                            .execute(pool)
+                                            .await
+                                    });
+
+                                    if let Err(e) = notify_result {
+                                        println!("Failed to send notification: {:?}", e);
+                                    }
+                                },
                                 Err(e) => println!("Error inserting/updating listing: {:?}", e),
                             }
                         },
