@@ -2,12 +2,27 @@ syntax = "proto3";
 
 package listing_stream;
 
-service ListingStream {
-    rpc StreamListings(StreamRequest) returns (stream Listing);
+message StreamRequest {
+    string update_type = 1;
 }
 
-message StreamRequest {
-    repeated string program_ids = 1;
+message UserAssets {
+    string address = 1;
+    double sol_balance = 2;
+    string token_holdings = 3;
+    string nft_holdings = 4;
+    string updated_at = 5;
+}
+
+message StreamResponse {
+    oneof update {
+        UserAssets user_assets = 1;
+        Listing listing = 2;
+    }
+}
+
+service ListingStream {
+    rpc StreamListings(StreamRequest) returns (stream StreamResponse);
 }
 
 message Listing {

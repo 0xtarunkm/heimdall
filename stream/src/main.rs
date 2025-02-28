@@ -17,7 +17,7 @@ use proto::listing_stream_server::{ListingStream, ListingStreamServer};
 #[derive(Debug, Deserialize)]
 struct NotifyPayload {
     account: String,
-    _action: String,
+    action: String,
 }
 
 #[derive(Debug, Clone)]

@@ -1,5 +1,6 @@
 {
   "libpath": "../target/release/libheimdall_plugin.dylib",
   "database_url": "postgres://admin:admin123@localhost:5432/heimdall",
-  "programs": ["Eu9bBA1heERyq8ppLhhizh7xpwzbZYbk56StznR9eR5G"]
+  "programs": ["Eu9bBA1heERyq8ppLhhizh7xpwzbZYbk56StznR9eR5G"],
+  "tracked_users": ["4u7doX2azLDwMyRqXTYd71VdU9QuEuv7kSDmYK5rHtnE"]
 }
