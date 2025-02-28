@@ -1,7 +1,9 @@
 use heimdall_plugin::Heimdall;
 use solana_geyser_plugin_interface::geyser_plugin_interface::GeyserPlugin;
 
+mod config;
 mod heimdall_plugin;
+mod models;
 
 #[no_mangle]
 #[allow(improper_ctypes_definitions)]

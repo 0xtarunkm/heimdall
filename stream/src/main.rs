@@ -1,20 +1,18 @@
 use futures::Stream;
 use serde::Deserialize;
-use sqlx::{postgres::PgListener, Pool, Postgres};
+use sqlx::{postgres::PgListener, Pool, Postgres, Row};
 use std::pin::Pin;
 use tokio::sync::mpsc;
 use tonic::{transport::Server, Request, Response, Status};
 
 mod proto {
     tonic::include_proto!("listing_stream");
-
-    pub(crate) const FILE_DESCRIPTOR_SET: &[u8] =
-        tonic::include_file_descriptor_set!("listing_stream_descriptor");
 }
 
 use proto::listing_stream_server::{ListingStream, ListingStreamServer};
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct NotifyPayload {
     account: String,
     action: String,
@@ -31,10 +29,7 @@ impl ListingStreamService {
         Ok(Self { pool })
     }
 
-    async fn start_listener(
-        &self,
-        tx: mpsc::Sender<Result<proto::Listing, Status>>,
-    ) {
+    async fn start_listener(&self, tx: mpsc::Sender<Result<proto::StreamResponse, Status>>) {
         let mut listener = match PgListener::connect_with(&self.pool).await {
             Ok(listener) => listener,
             Err(e) => {
@@ -43,23 +38,45 @@ impl ListingStreamService {
             }
         };
 
-        if let Err(e) = listener.listen("account_updates").await {
-            eprintln!("Failed to listen to channel: {:?}", e);
-            return;
+        for channel in ["account_updates", "user_updates"] {
+            if let Err(e) = listener.listen(channel).await {
+                eprintln!("Failed to listen to channel {}: {:?}", channel, e);
+                return;
+            }
         }
 
-        println!("Listening for account updates...");
+        println!("Listening for updates...");
 
         while let Some(notification) = listener.recv().await.ok() {
             match serde_json::from_str::<NotifyPayload>(notification.payload()) {
                 Ok(payload) => {
-                    match self.fetch_listing(&payload.account).await {
-                        Ok(listing) => {
-                            if let Err(e) = tx.send(Ok(listing)).await {
-                                eprintln!("Failed to send listing update: {:?}", e);
+                    let result = match payload.action.as_str() {
+                        "account_update" => self.fetch_listing(&payload.account).await
+                            .map(|opt_listing| opt_listing.map(|l| 
+                                proto::StreamResponse {
+                                    update: Some(proto::stream_response::Update::Listing(l))
+                                }
+                            )),
+                        "user_update" => self.fetch_user_assets(&payload.account).await
+                            .map(|assets| Some(proto::StreamResponse {
+                                update: Some(proto::stream_response::Update::UserAssets(assets))
+                            })),
+                        _ => {
+                            eprintln!("Unknown action type: {}", payload.action);
+                            Ok(None)
+                        }
+                    };
+
+                    match result {
+                        Ok(Some(response)) => {
+                            if let Err(e) = tx.send(Ok(response)).await {
+                                eprintln!("Failed to send update: {:?}", e);
                             }
                         }
-                        Err(e) => eprintln!("Failed to fetch listing: {:?}", e),
+                        Ok(None) => {
+                            eprintln!("No data found for account: {}", payload.account);
+                        }
+                        Err(e) => eprintln!("Failed to fetch data: {:?}", e),
                     }
                 }
                 Err(e) => eprintln!("Failed to parse notification payload: {:?}", e),
@@ -67,7 +84,37 @@ impl ListingStreamService {
         }
     }
 
-    async fn fetch_listing(&self, account: &str) -> Result<proto::Listing, sqlx::Error> {
+    async fn fetch_user_assets(&self, account: &str) -> Result<proto::UserAssets, sqlx::Error> {
+        let table_name = format!("user_{}", account.replace(&['.' as char, '-' as char][..], "_"));
+        
+        let query = format!(
+            r#"
+            SELECT 
+                CAST(sol_balance AS DOUBLE PRECISION) as sol_balance,
+                token_holdings::text as token_holdings,
+                nft_holdings::text as nft_holdings,
+                timestamp::text as updated_at
+            FROM {}
+            ORDER BY timestamp DESC
+            LIMIT 1
+            "#,
+            table_name
+        );
+
+        let record = sqlx::query(&query)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(proto::UserAssets {
+            address: account.to_string(),
+            sol_balance: record.get("sol_balance"),
+            token_holdings: record.get("token_holdings"),
+            nft_holdings: record.get("nft_holdings"),
+            updated_at: record.get("updated_at"),
+        })
+    }
+
+    async fn fetch_listing(&self, account: &str) -> Result<Option<proto::Listing>, sqlx::Error> {
         let record = sqlx::query!(
             r#"
             SELECT 
@@ -90,40 +137,41 @@ impl ListingStreamService {
             "#,
             account
         )
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await?;
 
-        Ok(proto::Listing {
-            account: record.account,
-            name: record.name,
-            seed: record.seed as u64,
-            mint: record.mint,
-            funding_goal: record.funding_goal as u64,
-            pool_mint_supply: record.pool_mint_supply.unwrap_or_default(),
-            funding_raised: record.funding_raised as u64,
-            available_tokens: record.available_tokens.unwrap_or_default(),
-            base_price: record.base_price,
-            tokens_sold: record.tokens_sold.unwrap_or_default(),
-            bump: record.bump as u32,
-            vault_bump: record.vault_bump as u32,
-            mint_bump: record.mint_bump as u32,
-            updated_at: record.updated_at.unwrap_or_default(),
-        })
+        Ok(record.map(|r| proto::Listing {
+            account: r.account,
+            name: r.name,
+            seed: r.seed as u64,
+            mint: r.mint,
+            funding_goal: r.funding_goal as u64,
+            pool_mint_supply: r.pool_mint_supply.unwrap_or_default(),
+            funding_raised: r.funding_raised as u64,
+            available_tokens: r.available_tokens.unwrap_or_default(),
+            base_price: r.base_price,
+            tokens_sold: r.tokens_sold.unwrap_or_default(),
+            bump: r.bump as u32,
+            vault_bump: r.vault_bump as u32,
+            mint_bump: r.mint_bump as u32,
+            updated_at: r.updated_at.unwrap_or_default(),
+        }))
     }
 }
 
 #[tonic::async_trait]
 impl ListingStream for ListingStreamService {
-    type StreamListingsStream = Pin<Box<dyn Stream<Item = Result<proto::Listing, Status>> + Send + 'static>>;
+    type StreamListingsStream =
+        Pin<Box<dyn Stream<Item = Result<proto::StreamResponse, Status>> + Send + 'static>>;
 
     async fn stream_listings(
         &self,
         _request: Request<proto::StreamRequest>,
     ) -> Result<Response<Self::StreamListingsStream>, Status> {
         let (tx, rx) = mpsc::channel(100);
-        
+
         let service = self.clone();
-        
+
         tokio::spawn(async move {
             service.start_listener(tx).await;
         });
@@ -137,21 +185,15 @@ impl ListingStream for ListingStreamService {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv::dotenv().ok();
 
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     let addr = "[::1]:50051".parse()?;
     let service = ListingStreamService::new(&database_url).await?;
 
     println!("Starting gRPC server on {}", addr);
 
-    let reflection_service = tonic_reflection::server::Builder::configure()
-        .register_encoded_file_descriptor_set(proto::FILE_DESCRIPTOR_SET)
-        .build()?;
-
     Server::builder()
         .add_service(ListingStreamServer::new(service))
-        .add_service(reflection_service)
         .serve(addr)
         .await?;
 

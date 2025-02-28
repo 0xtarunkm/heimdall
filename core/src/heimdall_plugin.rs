@@ -1,6 +1,5 @@
 use anchor_lang::solana_program::clock::Slot;
-use anchor_lang::{prelude::*, AnchorDeserialize};
-use serde::{Deserialize, Serialize};
+use anchor_lang::AnchorDeserialize;
 use solana_geyser_plugin_interface::geyser_plugin_interface::{
     GeyserPlugin, GeyserPluginError, ReplicaAccountInfoVersions, Result as PluginResult,
 };
@@ -9,8 +8,12 @@ use spl_token::solana_program::pubkey::Pubkey;
 use spl_token::state::Account as TokenAccount;
 use spl_token::ID as SPL_TOKEN_PROGRAM_ID;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres, Row};
-use std::{error::Error, fs::OpenOptions, io::Read};
 use tokio::runtime::Runtime;
+
+use crate::{
+    config::Config,
+    models::{AnchorListing, Listing},
+};
 
 #[derive(Debug)]
 pub struct Heimdall {
@@ -18,56 +21,6 @@ pub struct Heimdall {
     config: Option<Config>,
     programs: Vec<[u8; 32]>,
     runtime: Runtime,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Config {
-    pub database_url: String,
-    pub programs: Option<Vec<String>>,
-    pub tracked_users: Option<Vec<String>>,
-}
-
-// reads directly from solana account data
-#[derive(Debug, AnchorDeserialize)]
-pub struct AnchorListing {
-    pub name: String,
-    pub seed: u64,
-    pub mint: Pubkey,
-    pub funding_goal: u64,
-    pub pool_mint_supply: u128,
-    pub funding_raised: u64,
-    pub available_tokens: u128,
-    pub base_price: f64,
-    pub tokens_sold: u128,
-    pub bump: u8,
-    pub vault_bump: u8,
-    pub mint_bump: u8,
-}
-
-// database/JSON operations
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Listing {
-    pub name: String,
-    pub seed: u64,
-    pub mint: String,
-    pub funding_goal: u64,
-    pub pool_mint_supply: u128,
-    pub funding_raised: u64,
-    pub available_tokens: u128,
-    pub base_price: f64,
-    pub tokens_sold: u128,
-    pub bump: u8,
-    pub vault_bump: u8,
-    pub mint_bump: u8,
-}
-
-impl Config {
-    pub fn load(config_path: &str) -> std::result::Result<Self, Box<dyn Error>> {
-        let mut file = OpenOptions::new().read(true).open(config_path)?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        Ok(serde_json::from_str::<Config>(&contents)?)
-    }
 }
 
 impl Default for Heimdall {
@@ -139,7 +92,6 @@ impl GeyserPlugin for Heimdall {
             println!("Error creating listings table: {:?}", e);
         }
 
-        // Create user tables for each tracked user
         if let Some(users) = &config.tracked_users {
             for user in users {
                 let create_user_table = format!(
@@ -193,13 +145,11 @@ impl GeyserPlugin for Heimdall {
 
         let account_pubkey = bs58::encode(account_info.pubkey).into_string();
 
-        // Handle user account updates
         if let Some(tracked_users) = &self.config.as_ref().unwrap().tracked_users {
             if tracked_users.contains(&account_pubkey) {
                 self.update_user_sol_balance(&account_pubkey, account_info.lamports)?;
             }
 
-            // Handle token accounts owned by tracked users
             if let Ok(owner_pubkey) = Pubkey::try_from(account_info.owner) {
                 if owner_pubkey == SPL_TOKEN_PROGRAM_ID {
                     if let Ok(token_account) = TokenAccount::unpack(&account_info.data) {
@@ -213,7 +163,6 @@ impl GeyserPlugin for Heimdall {
             }
         }
 
-        // Handle program account updates
         self.programs.iter().for_each(|program| {
             if program == account_info.owner {
                 if account_info.data.len() > 8 {

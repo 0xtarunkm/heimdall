@@ -2,29 +2,21 @@ syntax = "proto3";
 
 package listing_stream;
 
+// Request message for streaming listings
 message StreamRequest {
-    string update_type = 1;
+    string update_type = 1;  // Type of updates to stream (e.g., "all", "listings", "users")
 }
 
+// Message for user asset updates
 message UserAssets {
     string address = 1;
     double sol_balance = 2;
-    string token_holdings = 3;
-    string nft_holdings = 4;
+    string token_holdings = 3;  // JSON string of token holdings
+    string nft_holdings = 4;    // JSON string of NFT holdings
     string updated_at = 5;
 }
 
-message StreamResponse {
-    oneof update {
-        UserAssets user_assets = 1;
-        Listing listing = 2;
-    }
-}
-
-service ListingStream {
-    rpc StreamListings(StreamRequest) returns (stream StreamResponse);
-}
-
+// Message for listing details
 message Listing {
     string account = 1;
     string name = 2;
@@ -40,4 +32,18 @@ message Listing {
     uint32 vault_bump = 12;
     uint32 mint_bump = 13;
     string updated_at = 14;
+}
+
+// Response message that can contain either a user assets update or a listing update
+message StreamResponse {
+    oneof update {
+        UserAssets user_assets = 1;
+        Listing listing = 2;
+    }
+}
+
+// The listing stream service definition
+service ListingStream {
+    // Stream listings and user assets updates
+    rpc StreamListings(StreamRequest) returns (stream StreamResponse);
 }
