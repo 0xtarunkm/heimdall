@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "stream"]
+members = ["core", "stream", "tui"]
 
 resolver = "2"
 
