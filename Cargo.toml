@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "stream", "tui"]
+members = ["core", "idl-extractor", "stream", "tui"]
 
 resolver = "2"
 
