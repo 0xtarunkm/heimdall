@@ -8,5 +8,7 @@ fn main() -> anyhow::Result<()> {
     config.protoc_arg("--experimental_allow_proto3_optional");
     config.compile_protos(&[proto_file], &["../geyser/proto/"])?;
 
+    gm gm
+
     Ok(())
 }
